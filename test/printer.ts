@@ -202,6 +202,19 @@ export function foldL<A extends string, R>(fa: Constrained<A>, onFetching: () =>
       )
     })
 
+    it('tuples', () => {
+      const printer = P.print
+      assert.strictEqual(
+        printer(E.Tuple2),
+        `export type Tuple2<A, B> = {
+    readonly type: "Tuple2";
+    readonly value0: [A, B];
+};
+
+export function tuple2<A, B>(value0: [A, B]): Tuple2<A, B> { return { type: "Tuple2", value0 }; }`
+      )
+    })
+
     it('records', () => {
       const printer = P.print
       assert.strictEqual(

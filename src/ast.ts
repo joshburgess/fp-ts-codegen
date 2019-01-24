@@ -41,8 +41,13 @@ const getMemberName = (m: M.Member, position: number): string => {
   return m.name.getOrElseL(() => `value${position}`)
 }
 
-const getType = (t: M.Type): ts.TypeReferenceNode => {
-  return ts.createTypeReferenceNode(t.name, t.parameters.map(p => getType(p)))
+const getType = (type: M.Type): ts.TypeNode => {
+  switch (type.kind) {
+    case 'TypeReference':
+      return ts.createTypeReferenceNode(type.name, type.parameters.map(p => getType(p)))
+    case 'TupleType':
+      return ts.createTupleTypeNode([getType(type.fst), getType(type.snd), ...type.other.map(getType)])
+  }
 }
 
 export const data = (d: M.Data): AST<ts.TypeAliasDeclaration> => {

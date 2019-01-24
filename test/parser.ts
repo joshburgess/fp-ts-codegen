@@ -5,6 +5,7 @@ import * as M from '../src/model'
 import * as E from './examples'
 import { right, left } from 'fp-ts/lib/Either'
 import { some } from 'fp-ts/lib/Option'
+import { Tree } from 'fp-ts/lib/Tree'
 
 const assertSuccess = <A>(parser: Parser<A>, input: string, expected: A) => {
   const result = parser.run(input)
@@ -38,31 +39,65 @@ describe('parser', () => {
   it('parameter', () => {
     const parser = P.parameter
     assertSuccess(parser, 'A', M.parameter('A'))
-    assertSuccess(parser, '(A :: string)', M.parameter('A', some(M.type('string'))))
-    assertSuccess(parser, '( A :: string )', M.parameter('A', some(M.type('string'))))
+    assertSuccess(parser, '(A :: string)', M.parameter('A', some(M.typeReference('string'))))
+    assertSuccess(parser, '( A :: string )', M.parameter('A', some(M.typeReference('string'))))
     assertFailure(parser, '(A)', 'Expected a parameter, cannot parse ")"')
+  })
+
+  it('getTreeParser', () => {
+    const parser = P.getTreeParser(P.identifier)
+    assertSuccess(parser, 'T', new Tree('T', []))
+    assertSuccess(parser, 'T ', new Tree('T', []))
+    assertSuccess(parser, '(T)', new Tree('T', []))
+    assertSuccess(parser, 'T\n', new Tree('T', []))
+    assertSuccess(parser, 'T A', new Tree('T', [new Tree('A', [])]))
+    assertSuccess(parser, 'T (A)', new Tree('T', [new Tree('A', [])]))
+    assertSuccess(parser, 'T ( A )', new Tree('T', [new Tree('A', [])]))
+    assertSuccess(parser, 'T A B', new Tree('T', [new Tree('A', []), new Tree('B', [])]))
+    assertSuccess(parser, 'T A (B)', new Tree('T', [new Tree('A', []), new Tree('B', [])]))
+    assertSuccess(parser, 'T A (B C)', new Tree('T', [new Tree('A', []), new Tree('B', [new Tree('C', [])])]))
+    assertSuccess(
+      parser,
+      'T (A B) C (D E)',
+      new Tree('T', [new Tree('A', [new Tree('B', [])]), new Tree('C', []), new Tree('D', [new Tree('E', [])])])
+    )
   })
 
   it('type', () => {
     const parser = P.type
-    assertSuccess(parser, 'A', M.type('A', []))
-    assertSuccess(parser, '(A)', M.type('A', []))
-    assertSuccess(parser, '( A )', M.type('A', []))
-    assertSuccess(parser, 'A ', M.type('A', []))
-    assertSuccess(parser, 'A1', M.type('A1', []))
-    assertSuccess(parser, 'A\n', M.type('A', []))
-    assertSuccess(parser, '(Some A)', M.type('Some', [M.type('A', [])]))
-    assertSuccess(parser, '(Tree A)', M.type('Tree', [M.type('A', [])]))
-    assertSuccess(parser, '(Tree A)', M.type('Tree', [M.type('A', [])]))
-    assertSuccess(parser, '( Tree A )', M.type('Tree', [M.type('A', [])]))
-    assertFailure(parser, '', 'Expected a type, cannot parse ""')
-    assertFailure(parser, '1', 'Expected a type, cannot parse "1"')
+    // type references
+    assertSuccess(parser, 'T', M.typeReference('T'))
+    assertSuccess(parser, '(T)', M.typeReference('T'))
+    assertSuccess(parser, '( T )', M.typeReference('T'))
+    assertSuccess(parser, 'T ', M.typeReference('T'))
+    assertSuccess(parser, 'T1', M.typeReference('T1'))
+    assertSuccess(parser, 'T\n', M.typeReference('T'))
+    assertSuccess(parser, 'T A', M.typeReference('T', [M.typeReference('A')]))
+    assertSuccess(parser, 'T (A)', M.typeReference('T', [M.typeReference('A')]))
+    assertSuccess(parser, 'T A B', M.typeReference('T', [M.typeReference('A'), M.typeReference('B')]))
+    assertSuccess(parser, 'T A (B)', M.typeReference('T', [M.typeReference('A'), M.typeReference('B')]))
+    // tuples
+    assertSuccess(parser, '(A, B)', M.tupleType(M.typeReference('A'), M.typeReference('B')))
+    assertSuccess(parser, '(A, B, C)', M.tupleType(M.typeReference('A'), M.typeReference('B'), [M.typeReference('C')]))
+    assertSuccess(
+      parser,
+      '(A, B, C D)',
+      M.tupleType(M.typeReference('A'), M.typeReference('B'), [M.typeReference('C', [M.typeReference('D')])])
+    )
   })
 
   it('constructor', () => {
     const parser = P.constructor
     assertSuccess(parser, 'None', E.Option.constructors.head)
     assertSuccess(parser, 'Some A', E.Option.constructors.tail[0])
+    assertSuccess(parser, 'Some (A)', E.Option.constructors.tail[0])
+    assertSuccess(parser, 'T A B', M.constructor('T', [M.member(M.typeReference('A')), M.member(M.typeReference('B'))]))
+    assertSuccess(
+      parser,
+      'T (A) B',
+      M.constructor('T', [M.member(M.typeReference('A')), M.member(M.typeReference('B'))])
+    )
+    assertSuccess(parser, 'T (A B)', M.constructor('T', [M.member(M.typeReference('A', [M.typeReference('B')]))]))
     assertSuccess(parser, 'Node (Tree A) A (Tree A)', E.Tree.constructors.tail[0])
     assertSuccess(parser, 'User { name :: string, surname :: string }', E.User.constructors.head)
   })

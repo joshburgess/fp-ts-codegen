@@ -5,4 +5,5 @@ import './Tree'
 import './FooBar'
 import './User'
 import './Constrained'
+import './Tuple2'
 
